@@ -82,8 +82,8 @@ def save_textbook(_step):
 
 @step(u'I should see a textbook named "([^"]*)" with a chapter path containing "([^"]*)"')
 def check_textbook(_step, textbook_name, chapter_name):
-    title = world.css_find(".textbook h3.textbook-title")
-    chapter = world.css_find(".textbook .wrap-textbook p")
+    title = world.css_find(".textbook h3.textbook-title").first
+    chapter = world.css_find(".textbook .wrap-textbook p").first
     assert title.text == textbook_name, "{} != {}".format(title.text, textbook_name)
     assert chapter.text == chapter_name, "{} != {}".format(chapter.text, chapter_name)
 

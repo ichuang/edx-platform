@@ -3,10 +3,11 @@
 
 from lettuce import world
 import time
+import json
 import platform
 from urllib import quote_plus
-from selenium.common.exceptions import WebDriverException, TimeoutException
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import (
+    WebDriverException, TimeoutException, StaleElementReferenceException)
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -20,8 +21,133 @@ def wait(seconds):
 
 
 @world.absorb
+def wait_for_js_variable_defined(variable):
+    js = """
+var callback = arguments[arguments.length - 1];
+var unloadHandler = function() {{
+  callback("unload");
+}}
+addEventListener("beforeunload", unloadHandler);
+addEventListener("unload", unloadHandler);
+var intervalID = setInterval(function() {{
+  try {{
+    if({variable}) {{
+      clearInterval(intervalID);
+      removeEventListener("beforeunload", unloadHandler);
+      removeEventListener("unload", unloadHandler);
+      callback(true);
+    }}
+  }} catch (e) {{}}
+}}, 10);
+    """.format(variable=variable)
+    result = world.browser.driver.execute_async_script(js)
+    if result == "unload":
+        # we ran this on the wrong page. Wait a bit, and try again, when the
+        # browser has loaded the next page.
+        world.wait(1)
+        return wait_for_js_variable_defined(variable)
+
+
+@world.absorb
+def wait_for_xmodule():
+    world.wait_for_js_variable_defined("XModule")
+
+
+@world.absorb
+def wait_for_mathjax():
+    world.wait_for_js_variable_defined("MathJax.isReady")
+
+
+class RequireJSError(Exception): pass
+
+
+@world.absorb
+def wait_for_requirejs(dependencies=None):
+    """
+    If requirejs is loaded on the page, this function will pause
+    Selenium until require is finished loading the given dependencies, or for a
+    maximum length of time (in seconds). If requirejs is not loaded on the page,
+    this function will return immediately.
+
+    :param dependencies: a list of strings that identify resources that
+        we should wait for requirejs to load. By default, requirejs will only
+        wait for jquery.
+    """
+    if not dependencies:
+        dependencies = ["jquery"]
+    # stick jquery at the front
+    if len(dependencies) < 1 or dependencies[0] != "jquery":
+        dependencies.insert(0, "jquery")
+    # str.format(): "If you need to include a brace character in the literal
+    # text, it can be escaped by doubling: {{ and }}."
+    # http://docs.python.org/2/library/string.html#formatstrings
+    js = """
+var callback = arguments[arguments.length - 1];
+if(window.require) {{
+  requirejs.onError = callback;
+  var unloadHandler = function() {{
+    callback("unload");
+  }}
+  addEventListener("beforeunload", unloadHandler);
+  addEventListener("unload", unloadHandler);
+  console.log("injecting...");
+  require({deps}, function($) {{
+    console.log("require is done");
+    setTimeout(function() {{
+      console.log("timeout")
+      removeEventListener("beforeunload", unloadHandler);
+      removeEventListener("unload", unloadHandler);
+      console.log("callback")
+      callback(true);
+    }}, 50);
+  }});
+}} else {{
+  callback(false);
+}}
+    """.format(deps=json.dumps(dependencies))
+    result = world.browser.driver.execute_async_script(js)
+    if result == "unload":
+        # we ran this on the wrong page. Wait a bit, and try again, when the
+        # browser has loaded the next page.
+        world.wait(1)
+        return wait_for_requirejs(dependencies)
+    elif result not in (None, True, False):
+        # we got a requirejs error
+        err = RequireJSError("Error loading dependencies: type={0} modules={1}".format(
+            result['requireType'], result['requireModules']))
+        err.error = result
+        raise err
+
+
+def ajax_complete(_driver):
+    return world.browser.evaluate_script("jQuery.active") == 0
+
+
+@world.absorb
+def wait_for_ajax_complete():
+    js = """
+var callback = arguments[arguments.length - 1];
+if(!window.jQuery) {callback(false);}
+var intervalID = setInterval(function() {
+  if(jQuery.active == 0) {
+    clearInterval(intervalID);
+    callback(true);
+  }
+}, 100);
+    """
+    world.browser.driver.execute_async_script(js)
+    #world.wait_for(ajax_complete)
+
+
+@world.absorb
+def wait_for_prompt_shown():
+    wait_for_present(".wrapper-prompt.is-shown")
+
+
+@world.absorb
 def visit(url):
     world.browser.visit(django_url(url))
+    wait_for_requirejs()
 
 
 @world.absorb
@@ -43,6 +169,7 @@ def is_css_not_present(css_selector, wait_time=5):
         raise
     finally:
         world.browser.driver.implicitly_wait(world.IMPLICIT_WAIT)
+
 
 @world.absorb
 def css_has_text(css_selector, text, index=0):

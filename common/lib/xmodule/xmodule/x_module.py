@@ -782,7 +782,7 @@ class ModuleSystem(Runtime):
     and user, or other environment-specific info.
     """
     def __init__(
-            self, ajax_url, track_function, get_module, render_template,
+            self, static_url, ajax_url, track_function, get_module, render_template,
             replace_urls, xmodule_field_data, user=None, filestore=None,
             debug=False, hostname="", xqueue=None, publish=None, node_path="",
             anonymous_student_id='', course_id=None,
@@ -791,6 +791,8 @@ class ModuleSystem(Runtime):
             replace_jump_to_id_urls=None, **kwargs):
         """
         Create a closure around the system environment.
+
+        static_url - the base URL to static assets
 
         ajax_url - the url where ajax calls to the encapsulating module go.
 
@@ -841,6 +843,7 @@ class ModuleSystem(Runtime):
         """
         super(ModuleSystem, self).__init__(**kwargs)
 
+        self.STATIC_URL = static_url
         self.ajax_url = ajax_url
         self.xqueue = xqueue
         self.track_function = track_function

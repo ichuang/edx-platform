@@ -1,6 +1,7 @@
-if (!CMS.Views['Settings']) CMS.Views.Settings = {};
+define(["js/views/validation", "jquery", "underscore", "gettext", "codemirror"],
+    function(ValidatingView, $, _, gettext, CodeMirror) {
 
-CMS.Views.Settings.Advanced = CMS.Views.ValidatingView.extend({
+var AdvancedView = ValidatingView.extend({
     error_saving : "error_saving",
     successful_changes: "successful_changes",
 
@@ -133,4 +134,7 @@ CMS.Views.Settings.Advanced = CMS.Views.ValidatingView.extend({
     blurInput : function(event) {
         $(event.target).prev().removeClass("is-focused");
     }
+});
+
+return AdvancedView;
 });

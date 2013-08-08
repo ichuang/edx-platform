@@ -1,4 +1,7 @@
-CMS.Views.ValidatingView = Backbone.View.extend({
+define(["backbone", "underscore", "jquery", "gettext", "js/views/feedback_notification", "js/views/feedback_alert", "jquery.smoothScroll"],
+    function(Backbone, _, $, gettext, NotificationView, AlertView) {
+
+var ValidatingView = Backbone.View.extend({
     // Intended as an abstract class which catches validation errors on the model and
     // decorates the fields. Needs wiring per class, but this initialization shows how
     // either have your init call this one or copy the contents
@@ -95,7 +98,7 @@ CMS.Views.ValidatingView = Backbone.View.extend({
             this.saved.hide();
         }
         var self = this;
-        this.confirmation = new CMS.Views.Notification.Warning({
+        this.confirmation = new NotificationView.Warning({
             title: this.save_title,
             message: message,
             actions: {
@@ -129,7 +132,7 @@ CMS.Views.ValidatingView = Backbone.View.extend({
 
     showSavedBar: function(title, message) {
         var defaultTitle = gettext('Your changes have been saved.');
-        this.saved = new CMS.Views.Alert.Confirmation({
+        this.saved = new AlertView.Confirmation({
             title: title || defaultTitle,
             message: message,
             closeIcon: false
@@ -155,3 +158,7 @@ CMS.Views.ValidatingView = Backbone.View.extend({
         );
     }
 });
+
+return ValidatingView;
+
+}); // end define()
