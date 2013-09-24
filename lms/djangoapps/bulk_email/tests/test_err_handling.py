@@ -141,7 +141,6 @@ class TestEmailErrors(ModuleStoreTestCase):
     @patch('bulk_email.tasks.send_course_email.retry')
     @patch('bulk_email.tasks.log')
     @patch('bulk_email.tasks.get_connection', Mock(return_value=EmailTestException))
-    @skip
     def test_general_exception(self, mock_log, retry, result):
         """
         Tests the if the error is not SMTP-related, we log and reraise
@@ -152,27 +151,21 @@ class TestEmailErrors(ModuleStoreTestCase):
             'subject': 'test subject for myself',
             'message': 'test message for myself'
         }
-# TODO: This whole test is flawed.   Figure out how to make it work correctly,
-# possibly moving it elsewhere.
         # For some reason (probably the weirdness of testing with celery tasks) assertRaises doesn't work here
         # so we assert on the arguments of log.exception
-        # TODO: This is way too fragile, because if any additional log statement is added anywhere in the flow,
-        # this test will break.
         self.client.post(self.url, test_email)
-#        ((log_str, email_id, to_list), _) = mock_log.exception.call_args
-# instead, use call_args_list[-1] to get the last call?
         self.assertTrue(mock_log.exception.called)
-#        self.assertIn('caused send_course_email task to fail with uncaught exception.', log_str)
-#        self.assertEqual(email_id, 1)
-#        self.assertEqual(to_list, [self.instructor.email])
+        ((log_str, _task_id, email_id, to_list), _) = mock_log.exception.call_args
+        self.assertIn('caused send_course_email task to fail with uncaught exception.', log_str)
+        self.assertEqual(email_id, 1)
+        self.assertEqual(to_list, [self.instructor.email])
         self.assertFalse(retry.called)
-# TODO: cannot use the result method to determine if a result was generated,
-# because we now call the particular method as part of all subtask calls.
-# So use result.called_count to track this...
-#        self.assertFalse(result.called)
-#        call_args_list = result.call_args_list
-        num_calls = result.called_count
-        self.assertTrue(num_calls == 1)
+        # check the results being returned
+        self.assertTrue(result.called)
+        ((sent, fail, optouts), _) = result.call_args
+        self.assertEquals(optouts, 0)
+        self.assertEquals(fail, 1)  # just myself
+        self.assertEquals(sent, 0)
 
     @patch('bulk_email.tasks.create_subtask_result')
     @patch('bulk_email.tasks.log')
