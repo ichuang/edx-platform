@@ -67,7 +67,7 @@ class TestEmailErrors(ModuleStoreTestCase):
         self.assertTrue(type(exc) == SMTPDataError)
 
     @patch('bulk_email.tasks.get_connection', autospec=True)
-    @patch('bulk_email.tasks.update_subtask_result')
+    @patch('bulk_email.tasks.create_subtask_result')
     @patch('bulk_email.tasks.send_course_email.retry')
     def test_data_err_fail(self, retry, result, get_conn):
         """
@@ -91,7 +91,7 @@ class TestEmailErrors(ModuleStoreTestCase):
         # We shouldn't retry when hitting a 5xx error
         self.assertFalse(retry.called)
         # Test that after the rejected email, the rest still successfully send
-        ((_, sent, fail, optouts), _) = result.call_args
+        ((sent, fail, optouts), _) = result.call_args
         self.assertEquals(optouts, 0)
         self.assertEquals(fail, settings.EMAILS_PER_TASK / 4)
         self.assertEquals(sent, 3 * settings.EMAILS_PER_TASK / 4)
@@ -137,7 +137,7 @@ class TestEmailErrors(ModuleStoreTestCase):
         exc = kwargs['exc']
         self.assertTrue(type(exc) == SMTPConnectError)
 
-    @patch('bulk_email.tasks.update_subtask_result')
+    @patch('bulk_email.tasks.create_subtask_result')
     @patch('bulk_email.tasks.send_course_email.retry')
     @patch('bulk_email.tasks.log')
     @patch('bulk_email.tasks.get_connection', Mock(return_value=EmailTestException))
@@ -153,7 +153,7 @@ class TestEmailErrors(ModuleStoreTestCase):
             'message': 'test message for myself'
         }
 # TODO: This whole test is flawed.   Figure out how to make it work correctly,
-# possibly moving it elsewhere.  It's hitting the wrong exception.
+# possibly moving it elsewhere.
         # For some reason (probably the weirdness of testing with celery tasks) assertRaises doesn't work here
         # so we assert on the arguments of log.exception
         # TODO: This is way too fragile, because if any additional log statement is added anywhere in the flow,
@@ -172,9 +172,9 @@ class TestEmailErrors(ModuleStoreTestCase):
 #        self.assertFalse(result.called)
 #        call_args_list = result.call_args_list
         num_calls = result.called_count
-        self.assertTrue(num_calls == 2)
+        self.assertTrue(num_calls == 1)
 
-    @patch('bulk_email.tasks.update_subtask_result')
+    @patch('bulk_email.tasks.create_subtask_result')
     @patch('bulk_email.tasks.log')
     def test_nonexist_email(self, mock_log, result):
         """
