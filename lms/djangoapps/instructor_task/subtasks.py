@@ -52,7 +52,7 @@ def update_instructor_task_for_subtasks(entry, action_name, total_num, subtask_i
     # Write out the subtasks information.
     num_subtasks = len(subtask_id_list)
     subtask_status = dict.fromkeys(subtask_id_list, QUEUING)
-    subtask_dict = {'total': num_subtasks, 'succeeded': 0, 'failed': 0, 'status': subtask_status}
+    subtask_dict = {'total': num_subtasks, 'succeeded': 0, 'failed': 0, 'retried': 0, 'status': subtask_status}
     entry.subtasks = json.dumps(subtask_dict)
 
     # and save the entry immediately, before any subtasks actually start work:
@@ -66,7 +66,7 @@ def update_subtask_status(entry_id, current_task_id, status, subtask_result):
     Update the status of the subtask in the parent InstructorTask object tracking its progress.
     """
     TASK_LOG.info("Preparing to update status for email subtask %s for instructor task %d with status %s",
-             current_task_id, entry_id, subtask_result)
+                  current_task_id, entry_id, subtask_result)
 
     try:
         entry = InstructorTask.objects.select_for_update().get(pk=entry_id)
@@ -113,10 +113,10 @@ def update_subtask_status(entry_id, current_task_id, status, subtask_result):
         entry.task_output = InstructorTask.create_output_for_success(task_progress)
 
         TASK_LOG.info("Task output updated to %s for email subtask %s of instructor task %d",
-                 entry.task_output, current_task_id, entry_id)
+                      entry.task_output, current_task_id, entry_id)
         TASK_LOG.debug("about to save....")
         entry.save()
-    except:
+    except Exception:
         TASK_LOG.exception("Unexpected error while updating InstructorTask.")
         transaction.rollback()
     else:

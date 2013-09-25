@@ -93,8 +93,9 @@ class TestEmailErrors(ModuleStoreTestCase):
         # Test that after the rejected email, the rest still successfully send
         ((sent, fail, optouts), _) = result.call_args
         self.assertEquals(optouts, 0)
-        self.assertEquals(fail, settings.EMAILS_PER_TASK / 4)
-        self.assertEquals(sent, 3 * settings.EMAILS_PER_TASK / 4)
+        expectedNumFails = int((settings.EMAILS_PER_TASK + 3) / 4.0)
+        self.assertEquals(fail, expectedNumFails)
+        self.assertEquals(sent, settings.EMAILS_PER_TASK - expectedNumFails)
 
     @patch('bulk_email.tasks.get_connection', autospec=True)
     @patch('bulk_email.tasks.send_course_email.retry')
