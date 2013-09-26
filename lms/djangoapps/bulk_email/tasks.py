@@ -37,6 +37,7 @@ from instructor_task.models import InstructorTask
 from instructor_task.subtasks import (
     update_subtask_status,
     create_subtask_result,
+    increment_subtask_result,
     update_instructor_task_for_subtasks,
 )
 
@@ -240,8 +241,9 @@ def send_course_email(entry_id, email_id, to_list, global_email_context):
 
     # Get information from current task's request:
     current_task_id = _get_current_task().request.id
-    log.info("Preparing to send email as subtask %s for instructor task %d: request = %s",
-             current_task_id, entry_id, _get_current_task().request)
+    num_to_send = len(to_list)
+    log.info("Preparing to send %s emails as subtask %s for instructor task %d: request = %s",
+             num_to_send, current_task_id, entry_id, _get_current_task().request)
 
     send_exception = None
     course_email_result_value = None
@@ -259,9 +261,10 @@ def send_course_email(entry_id, email_id, to_list, global_email_context):
         _, send_exception, traceback = exc_info()
         traceback_string = format_exc(traceback) if traceback is not None else ''
         log.error("background task (%s) failed unexpectedly: %s %s", current_task_id, send_exception, traceback_string)
-        # consider all emails to not be sent, and update stats:
-        num_error = len(to_list)
-        course_email_result_value = create_subtask_result(0, num_error, 0)
+        # We got here for really unexpected reasons.  Since we don't know how far
+        # the task got in emailing, we count all recipients as having failed.
+        # It at least keeps the counts consistent.
+        course_email_result_value = create_subtask_result(0, num_to_send, 0)
 
     if send_exception is None:
         # Update the InstructorTask object that is storing its progress.
@@ -505,10 +508,13 @@ def _submit_for_retry(entry_id, email_id, to_list, global_email_context, current
         # If there are no more retries, because the maximum has been reached,
         # we expect the original exception to be raised.  We catch it here
         # (and put it in retry_exc just in case it's different, but it shouldn't be),
-        # and update status as if it were any other failure.
+        # and update status as if it were any other failure.  That means that
+        # the recipients still in the to_list are counted as failures.
         log.exception('Task %s: email with id %d caused send_course_email task to fail to retry. To list: %s',
                       task_id, email_id, [i['email'] for i in to_list])
-        return subtask_progress, retry_exc
+        num_failed = len(to_list)
+        new_subtask_progress = increment_subtask_result(subtask_progress, 0, num_failed, 0)
+        return new_subtask_progress, retry_exc
 
 
 def _statsd_tag(course_title):
