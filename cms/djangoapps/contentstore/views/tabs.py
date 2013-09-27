@@ -9,12 +9,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django_future.csrf import ensure_csrf_cookie
 from mitxmako.shortcuts import render_to_response
-
 from xmodule.modulestore import Location
 from xmodule.modulestore.inheritance import own_metadata
 from xmodule.modulestore.django import modulestore
+from xmodule.exceptions import NotAllowedError
+
 from ..utils import get_course_for_item, get_modulestore
 from .access import get_location_and_verify_access
+
 
 __all__ = ['edit_tabs', 'reorder_static_tabs', 'static_pages']
 
@@ -84,6 +86,7 @@ def reorder_static_tabs(request):
     # MongoKeyValueStore before we update the mongo datastore.
     course.save()
     modulestore('direct').update_metadata(course.location, own_metadata(course))
+    # TODO: above two lines are used for the primitive-save case. Maybe factor them out?
     return HttpResponse()
 
 
@@ -136,3 +139,39 @@ def static_pages(request, org, course, coursename):
     return render_to_response('static-pages.html', {
         'context_course': course,
     })
+
+
+# "primitive" tab edit functions driven by the command line
+# These should be replaced/deleted by a more capable GUI someday.
+
+def preflight(num, typ):
+    'Throws for the disallowed cases.'
+    if num <= 2:
+        raise NotAllowedError('Tabs 1 and 2 cannot be edited')
+    if typ == 'static_tab':
+        raise NotAllowedError('Tabs of type static_tab cannot be edited here (use Studio)')
+
+
+def primitive_delete(course, num):
+    'Deletes the given tab number.'
+    tabs = course.tabs
+    preflight(num, tabs[num - 1].get('type', ''))  # -1 due to our 1-based indexing
+    del tabs[num - 1]
+    # Note: if we did delete static_tab, Chris Dodge mentioned that there's other stuff to delete as well.
+    primitive_save(course)
+
+
+def primitive_insert(course, num, typ, name):
+    'Inserts a new tab at the given number.'
+    preflight(num, typ)
+    new_tab = {u'type': unicode(typ), u'name': unicode(name)}
+    tabs = course.tabs
+    tabs.insert(num - 1, new_tab)  # -1 as above
+    primitive_save(course)
+
+
+def primitive_save(course):
+    'Saves the course back to modulestore.'
+    # This code copied from reorder_static_tabs above
+    course.save()
+    modulestore('direct').update_metadata(course.location, own_metadata(course))

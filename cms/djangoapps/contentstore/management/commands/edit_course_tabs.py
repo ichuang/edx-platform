@@ -13,15 +13,12 @@ from django.core.management.base import BaseCommand, CommandError
 from .prompt import query_yes_no
 
 from courseware.courses import get_course_by_id
-# for saving
-from xmodule.modulestore.inheritance import own_metadata
-from xmodule.modulestore.django import modulestore
+
+from contentstore.views import tabs
+from xmodule.exceptions import NotAllowedError
 
 
-# These do_xxx functions don't have a lot of UI. Someday we could
-# implement a GUI that calls down to pretty similar code.
-
-def do_print(course):
+def print_course(course):
     "Prints out the course id and a numbered list of tabs."
     print course.id
     count = 1
@@ -29,43 +26,6 @@ def do_print(course):
         print count, '"' + item.get('type') + '"', '"' + item.get('name', '') + '"'
         count += 1
 
-
-def preflight(num, typ):
-    'Throws for the disallowed cases.'
-    if num <= 2:
-        raise CommandError('Tabs 1 and 2 cannot be edited')
-    if typ == 'static_tab':
-        raise CommandError('Tabs of type static_tab cannot be edited here (use Studio)')
-
-
-def do_delete(course, num):
-    'Deletes the given tab number.'
-    tabs = course.tabs
-    preflight(num, tabs[num - 1].get('type', ''))  # -1 due to our 1-based indexing
-    del tabs[num - 1]
-    # Note: if we did delete static_tab, apparently there's some other stuff to delete as well.
-    do_save(course)
-    print "*Deleted*"
-    do_print(course)
-
-
-def do_insert(course, num, typ, name):
-    'Inserts a new tab at the given number.'
-    preflight(num, typ)
-    new_tab = {u'type': unicode(typ), u'name': unicode(name)}
-    tabs = course.tabs
-    tabs.insert(num - 1, new_tab)  # -1 as above
-    do_save(course)
-    print '*Inserted*'
-    do_print(course)
-
-
-def do_save(course):
-    'Saves the course back to modulestore.'
-    # This code copied from
-    #  ~/edx_all/edx-platform/cms/djangoapps/contentstore/views/tabs.py
-    course.save()
-    modulestore('direct').update_metadata(course.location, own_metadata(course))
 
 # course.tabs looks like this
 # [{u'type': u'courseware'}, {u'type': u'course_info', u'name': u'Course Info'}, {u'type': u'textbooks'},
@@ -106,19 +66,24 @@ static_tab cannot be edited (use Studio for those).
 
         print 'Warning: this command directly edits the list of course tabs in mongo.'
         print 'Tabs before any changes:'
-        do_print(course)
+        print_course(course)
 
-        if options['delete']:
-            if len(args) != 1:
-                raise CommandError(Command.delete_option.help)
-            num = int(args[0])
-            if query_yes_no('Deleting tab {0} Confirm?'.format(num), default='no'):
-                do_delete(course, num)
-        elif options['insert']:
-            if len(args) != 3:
-                raise CommandError(Command.insert_option.help)
-            num = int(args[0])
-            typ = args[1]
-            name = args[2]
-            if query_yes_no('Inserting tab {0} "{1}" "{2}" Confirm?'.format(num, typ, name), default='no'):
-                do_insert(course, num, args[1], args[2])
+        try:
+            if options['delete']:
+                if len(args) != 1:
+                    raise CommandError(Command.delete_option.help)
+                num = int(args[0])
+                if query_yes_no('Deleting tab {0} Confirm?'.format(num), default='no'):
+                    tabs.primitive_delete(course, num)
+            elif options['insert']:
+                if len(args) != 3:
+                    raise CommandError(Command.insert_option.help)
+                num = int(args[0])
+                typ = args[1]
+                name = args[2]
+                if query_yes_no('Inserting tab {0} "{1}" "{2}" Confirm?'.format(num, typ, name), default='no'):
+                    tabs.primitive_insert(course, num, args[1], args[2])
+        except NotAllowedError as e:
+            # Cute: translate NotAllowedError to CommandError so the CLI error
+            # prints nicely.
+            raise CommandError(e)

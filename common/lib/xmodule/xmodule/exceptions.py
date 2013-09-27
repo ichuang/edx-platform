@@ -31,3 +31,7 @@ class SerializationError(Exception):
     def __init__(self, location, msg):
         super(SerializationError, self).__init__(msg)
         self.location = location
+
+
+class NotAllowedError(Exception):
+    pass
