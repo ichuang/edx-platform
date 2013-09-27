@@ -8,61 +8,48 @@ from common import course_id
 from student.models import CourseEnrollment
 
 
-@step('I view the LTI and it is not rendered$')
+@step('I view the LTI and error is shown$')
 def lti_is_not_rendered(_step):
-    # lti div has no class rendered
-    assert world.is_css_not_present('div.lti.rendered')
-
     # error is shown
-    assert world.css_visible('.error_message')
+    assert world.is_css_present('.error_message')
 
-    # iframe is not visible
-    assert not world.css_visible('iframe')
+    # iframe is not presented
+    assert not world.is_css_present('iframe')
 
-    #inside iframe test content is not presented
-    with world.browser.get_iframe('ltiLaunchFrame') as iframe:
-        # iframe does not contain functions from terrain/ui_helpers.py
-        world.browser.driver.implicitly_wait(1)
-        try:
-            assert iframe.is_element_not_present_by_css('.result', wait_time=1)
-        except:
-            raise
-        finally:
-            world.browser.driver.implicitly_wait(world.IMPLICIT_WAIT)
+    # link is not presented
+    assert not world.is_css_present('.link_lti_new_window')
 
 
-@step('I view the LTI and it is rendered$')
-def lti_is_rendered(_step):
-    # lti div has class rendered
-    assert world.is_css_present('div.lti.rendered')
+@step('I view the LTI and it is rendered in (.*)$')
+def lti_is_rendered(_step, rendered_in):
+    if rendered_in.stip() == 'iframe':
+        assert world.is_css_present('iframe')
+        assert not world.is_css_present('.link_lti_new_window')
+        assert not world.is_css_present('.error_message')
 
-    # error is hidden
-    assert not world.css_visible('.error_message')
+        #inside iframe test content is presented
+        with world.browser.get_iframe('ltiLaunchFrame') as iframe:
+            # iframe does not contain functions from terrain/ui_helpers.py
+            assert iframe.is_element_present_by_css('.result', wait_time=5)
+            assert ("This is LTI tool. Success." == world.retry_on_exception(
+                lambda: iframe.find_by_css('.result')[0].text,
+                max_attempts=5
+            ))
 
-    # iframe is visible
-    assert world.css_visible('iframe')
-
-    #inside iframe test content is presented
-    with world.browser.get_iframe('ltiLaunchFrame') as iframe:
-        # iframe does not contain functions from terrain/ui_helpers.py
-        assert iframe.is_element_present_by_css('.result', wait_time=5)
-        assert ("This is LTI tool. Success." == world.retry_on_exception(
-            lambda: iframe.find_by_css('.result')[0].text,
-            max_attempts=5
-        ))
+    elif rendered_in.stip() == 'new page':
+        assert not world.is_css_present('iframe')
+        assert world.is_css_present('.link_lti_new_window')
+        assert not world.is_css_present('.error_message')
+        # TODO, follow target = _blank here
+    else:  # incorrent rendered_in parametetr
+        assert False
 
 
 @step('I view the LTI but incorrect_signature warning is rendered$')
 def incorrect_lti_is_rendered(_step):
-    # lti div has class rendered
-    assert world.is_css_present('div.lti.rendered')
-
-    # error is hidden
-    assert not world.css_visible('.error_message')
-
-    # iframe is visible
-    assert world.css_visible('iframe')
-
+    assert world.is_css_present('iframe')
+    assert not world.is_css_present('.link_lti_new_window')
+    assert not world.is_css_present('.error_message')
     #inside iframe test content is presented
     with world.browser.get_iframe('ltiLaunchFrame') as iframe:
         # iframe does not contain functions from terrain/ui_helpers.py
@@ -97,44 +84,28 @@ def set_incorrect_lti_passport(_step):
     i_am_registered_for_the_course(coursenum, metadata)
 
 
-@step('the course has an LTI component filled with correct fields$')
-def add_correct_lti_to_course(_step):
+@step('the course has an LTI component with(.*)correct fields, new_page is(.*)$')
+def add_incorrect_lti_to_course(_step, incorrect, new_page):
     category = 'lti'
-    world.ItemFactory.create(
-        # parent_location=section_location(course),
-        parent_location=world.scenario_dict['SEQUENTIAL'].location,
-        category=category,
-        display_name='LTI',
-        metadata={
-            'lti_id': 'correct_lti_id',
-            'launch_url': world.lti_server.oauth_settings['lti_base'] + world.lti_server.oauth_settings['lti_endpoint']
-        }
-    )
-    course = world.scenario_dict["COURSE"]
-    chapter_name = world.scenario_dict['SECTION'].display_name.replace(
-        " ", "_")
-    section_name = chapter_name
-    path = "/courses/{org}/{num}/{name}/courseware/{chapter}/{section}".format(
-        org=course.org,
-        num=course.number,
-        name=course.display_name.replace(' ', '_'),
-        chapter=chapter_name,
-        section=section_name)
-    url = django_url(path)
 
-    world.browser.visit(url)
+    if incorrect.strip():  # incorrect fields
+        lti_id = 'incorrect_lti_id'
+    else:  # correct fields
+        lti_id = 'correct_lti_id'
 
+    if new_page.strip().lower() == 'false':
+        new_page = False
+    else:  # default is True
+        new_page = True
 
-@step('the course has an LTI component with incorrect fields$')
-def add_incorrect_lti_to_course(_step):
-    category = 'lti'
     world.ItemFactory.create(
         parent_location=world.scenario_dict['SEQUENTIAL'].location,
         category=category,
         display_name='LTI',
         metadata={
-            'lti_id': 'incorrect_lti_id',
-            'lti_url': world.lti_server.oauth_settings['lti_base'] + world.lti_server.oauth_settings['lti_endpoint']
+            'lti_id': lti_id,
+            'launch_url': world.lti_server.oauth_settings['lti_base'] + world.lti_server.oauth_settings['lti_endpoint'],
+            'new_page': new_page
         }
     )
     course = world.scenario_dict["COURSE"]
