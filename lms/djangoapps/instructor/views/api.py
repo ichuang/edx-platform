@@ -213,6 +213,73 @@ def students_update_enrollment(request, course_id):
 
 @ensure_csrf_cookie
 @cache_control(no_cache=True, no_store=True, must_revalidate=True)
+@require_level('staff')
+@require_query_params(action="enroll or unenroll", unique_student_identifier="email or username of student")
+def single_student_update_enrollment(request, course_id):
+    """
+    Enroll or unenroll students by email or username.
+    Requires staff access.
+
+    Query Parameters:
+    - action in ['enroll', 'unenroll']
+    - unique_student_identifier is string containing an email or username of a student
+    - auto_enroll is a boolean (defaults to false)
+        If auto_enroll is false, students will be allowed to enroll.
+        If auto_enroll is true, students will be enrolled as soon as they register.
+
+    Returns an analog to this JSON structure: {
+        "action": "enroll",
+        "auto_enroll": false,
+        "results": [
+            {
+                "student_identifier": "testemail@test.org",
+                "before": {
+                    "enrollment": false,
+                    "auto_enroll": false,
+                    "user": true,
+                    "allowed": false
+                },
+                "after": {
+                    "enrollment": true,
+                    "auto_enroll": false,
+                    "user": true,
+                    "allowed": false
+                }
+            }
+        ]
+    }
+    """
+    action = request.GET.get('action')
+    student_identifier = request.GET.get('unique_student_identifier', None)
+    student = None
+    if student_identifier is not None:
+        student = get_student_from_identifier(student_identifier)
+    auto_enroll = request.GET.get('auto_enroll', False) in ['true', 'True', True]
+
+    results = []
+    if action == 'enroll':
+        before, after = enroll_email(course_id, student.email, auto_enroll)
+    elif action == 'unenroll':
+        before, after = unenroll_email(course_id, student.email)
+    else:
+        return HttpResponseBadRequest("Unrecognized action '{}'".format(action))
+
+    results.append({
+        'student_identifier': student_identifier,
+        'before': before.to_dict(),
+        'after': after.to_dict(),
+    })
+
+    response_payload = {
+        'action': action,
+        'results': results,
+        'auto_enroll': auto_enroll,
+    }
+    return JsonResponse(response_payload)
+
+
+@ensure_csrf_cookie
+@cache_control(no_cache=True, no_store=True, must_revalidate=True)
 @require_level('instructor')
 @common_exceptions_400
 @require_query_params(

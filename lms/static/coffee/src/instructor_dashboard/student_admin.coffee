@@ -133,30 +133,36 @@ class StudentAdmin
 
     # enroll student
     @$btn_enroll.click =>
+      unique_student_identifier = @$field_student_select_progress.val()
+      if not unique_student_identifier
+        return @$request_response_error_progress.text "Please enter a student email address or username."
       send_data =
         action: 'enroll'
-        emails: @$field_student_select_progress.val()
+        unique_student_identifier: unique_student_identifier
         auto_enroll: false
 
       $.ajax
         dataType: 'json'
         url: @$btn_enroll.data 'endpoint'
         data: send_data
-        success: @clear_errors_then -> console.log "student #{send_data.emails} enrolled"
-        error: std_ajax_err => @$request_response_error_progress.text "Error enrolling student '#{send_data.emails}'."
+        success: @clear_errors_then -> alert "Student #{unique_student_identifier} successfully enrolled."
+        error: std_ajax_err => @$request_response_error_progress.text "Error enrolling student '#{unique_student_identifier}'."
 
     # unenroll student
     @$btn_unenroll.click =>
+      unique_student_identifier = @$field_student_select_progress.val()
+      if not unique_student_identifier
+        return @$request_response_error_progress.text "Please enter a student email address or username."
       send_data =
         action: 'unenroll'
-        emails: @$field_student_select_progress.val()
+        unique_student_identifier: unique_student_identifier
 
       $.ajax
         dataType: 'json'
         url: @$btn_unenroll.data 'endpoint'
         data: send_data
-        success: @clear_errors_then -> console.log "student #{send_data.emails} unenrolled"
-        error: std_ajax_err => @$request_response_error_progress.text "Error unenrolling student '#{send_data.emails}'."
+        success: @clear_errors_then -> alert "Student #{unique_student_identifier} successfully unenrolled"
+        error: std_ajax_err => @$request_response_error_progress.text "Error unenrolling student '#{unique_student_identifier}'."
 
     # reset attempts for student on problem
     @$btn_reset_attempts_single.click =>

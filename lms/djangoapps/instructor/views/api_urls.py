@@ -22,6 +22,8 @@ urlpatterns = patterns('',  # nopep8
         'instructor.views.api.get_distribution', name="get_distribution"),
     url(r'^get_student_progress_url$',
         'instructor.views.api.get_student_progress_url', name="get_student_progress_url"),
+    url(r'^single_student_update_enrollment$',
+        'instructor.views.api.single_student_update_enrollment', name="single_student_update_enrollment"),
     url(r'^reset_student_attempts$',
         'instructor.views.api.reset_student_attempts', name="reset_student_attempts"),
     url(r'^rescore_problem$',
