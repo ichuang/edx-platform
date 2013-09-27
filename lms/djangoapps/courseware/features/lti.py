@@ -84,14 +84,19 @@ def set_incorrect_lti_passport(_step):
     i_am_registered_for_the_course(coursenum, metadata)
 
 
-@step('the course has an LTI component with(.*)correct fields, new_page is(.*)$')
-def add_incorrect_lti_to_course(_step, incorrect, new_page):
+@step('the course has an LTI component with (.*) fields, new_page is(.*)$')
+def add_incorrect_lti_to_course(_step, fields, new_page):
     category = 'lti'
-
-    if incorrect.strip():  # incorrect fields
+    lti_id = 'correct_lti_id'
+    launch_url = world.lti_server.oauth_settings['lti_base'] + world.lti_server.oauth_settings['lti_endpoint']
+    if fields.strip() == 'incorrect_lti_id':  # incorrect fields
         lti_id = 'incorrect_lti_id'
-    else:  # correct fields
-        lti_id = 'correct_lti_id'
+    elif fields.strip() == 'correct':  # correct fields
+        pass
+    elif fields.strip() == 'no_launch_url':
+        launch_url = u''
+    else:  # incorrect parameter
+        assert False
 
     if new_page.strip().lower() == 'false':
         new_page = False
@@ -104,8 +109,8 @@ def add_incorrect_lti_to_course(_step, incorrect, new_page):
         display_name='LTI',
         metadata={
             'lti_id': lti_id,
-            'launch_url': world.lti_server.oauth_settings['lti_base'] + world.lti_server.oauth_settings['lti_endpoint'],
-            'new_page': new_page
+            'launch_url': launch_url,
+            'open_in_a_new_page': new_page
         }
     )
     course = world.scenario_dict["COURSE"]
