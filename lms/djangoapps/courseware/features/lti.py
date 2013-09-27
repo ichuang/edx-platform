@@ -22,7 +22,7 @@ def lti_is_not_rendered(_step):
 
 @step('I view the LTI and it is rendered in (.*)$')
 def lti_is_rendered(_step, rendered_in):
-    if rendered_in.stip() == 'iframe':
+    if rendered_in.strip() == 'iframe':
         assert world.is_css_present('iframe')
         assert not world.is_css_present('.link_lti_new_window')
         assert not world.is_css_present('.error_message')
@@ -36,11 +36,11 @@ def lti_is_rendered(_step, rendered_in):
                 max_attempts=5
             ))
 
-    elif rendered_in.stip() == 'new page':
+    elif rendered_in.strip() == 'new page':
         assert not world.is_css_present('iframe')
         assert world.is_css_present('.link_lti_new_window')
         assert not world.is_css_present('.error_message')
-        # TODO, follow target = _blank here
+        # TODO, click link and follow target = _blank here
     else:  # incorrent rendered_in parametetr
         assert False
 

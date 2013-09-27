@@ -14,15 +14,15 @@ Feature: LMS.LTI component
 
   Scenario: LTI component in LMS is rendered incorrectly
   Given the course has incorrect LTI credentials
-  And the course has an LTI component filled with correct fields, new_page is false
+  And the course has an LTI component with correct fields, new_page is false
   Then I view the LTI but incorrect_signature warning is rendered
 
   Scenario: LTI component in LMS is correclty rendered in new page
   Given the course has correct LTI credentials
-  And the course has an LTI component filled with correct fields, new_page is true
+  And the course has an LTI component with correct fields, new_page is true
   Then I view the LTI and it is rendered in new page
 
   Scenario: LTI component in LMS is correclty rendered in iframe
   Given the course has correct LTI credentials
-  And the course has an LTI component filled with correct fields, new_page is false
+  And the course has an LTI component with correct fields, new_page is false
   Then I view the LTI and it is rendered in iframe
