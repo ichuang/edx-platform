@@ -229,16 +229,26 @@ STATICFILES_STORAGE = 'pipeline.storage.PipelineCachedStorage'
 from rooted_paths import rooted_glob
 
 PIPELINE_CSS = {
-    'base-style': {
+    'style-vendor': {
         'source_filenames': [
             'js/vendor/CodeMirror/codemirror.css',
             'css/vendor/ui-lightness/jquery-ui-1.8.22.custom.css',
             'css/vendor/jquery.qtip.min.css',
+        ],
+        'output_filename': 'css/cms-style-vendor.css',
+    },
+    'style-app': {
+        'source_filenames': [
             'sass/base-style.css',
+        ],
+        'output_filename': 'css/cms-style-app.css',
+    },
+    'style-external': {
+        'source_filenames': [
             'xmodule/modules.css',
             'xmodule/descriptor.css',
         ],
-        'output_filename': 'css/cms-base-style.css',
+        'output_filename': 'css/cms-style-external.css',
     },
 }
 
