@@ -1,5 +1,6 @@
 #pylint: disable=C0111
 
+import os
 from django.contrib.auth.models import User
 from lettuce import world, step
 from lettuce.django import django_url
@@ -40,7 +41,7 @@ def lti_is_rendered(_step, rendered_in):
         assert not world.is_css_present('iframe')
         assert world.is_css_present('.link_lti_new_window')
         assert not world.is_css_present('.error_message')
-        # TODO, click link and follow target = _blank here
+        check_lti_popup()
     else:  # incorrent rendered_in parametetr
         assert False
 
@@ -168,3 +169,28 @@ def i_am_registered_for_the_course(course, metadata):
     CourseEnrollment.enroll(usr, course_id(course))
 
     world.log_in(username='robot', password='test')
+
+
+def check_lti_popup():
+    parent_window = world.browser.current_window # Save the parent window
+    world.css_find('.link_lti_new_window').first.click()
+
+    assert len(world.browser.windows) != 1
+
+    for window in world.browser.windows:
+        world.browser.switch_to_window(window) # Switch to a different window (the pop-up)
+        # Check if this is the one we want by comparing the url
+        url = world.browser.url
+        basename = os.path.basename(url)
+        pathname = os.path.splitext(basename)[0]
+
+        if pathname == u'correct_lti_endpoint':
+            break
+
+    result = world.css_find('.result').first.text
+    assert result == u'This is LTI tool. Success.'
+
+    world.browser.driver.close() # Close the pop-up window
+    world.browser.switch_to_window(parent_window) # Switch to the main window again
+
+
