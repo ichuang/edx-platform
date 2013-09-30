@@ -129,7 +129,7 @@ def update_instructor_task_for_subtasks(entry, action_name, total_num, subtask_i
 
 
 @transaction.commit_manually
-def update_subtask_status(entry_id, current_task_id, subtask_status):
+def update_subtask_status(entry_id, current_task_id, new_subtask_status):
     """
     Update the status of the subtask in the parent InstructorTask object tracking its progress.
 
@@ -155,13 +155,13 @@ def update_subtask_status(entry_id, current_task_id, subtask_status):
     messages, progress made, etc.
     """
     TASK_LOG.info("Preparing to update status for email subtask %s for instructor task %d with status %s",
-                  current_task_id, entry_id, subtask_status)
+                  current_task_id, entry_id, new_subtask_status)
 
     try:
         entry = InstructorTask.objects.select_for_update().get(pk=entry_id)
         subtask_dict = json.loads(entry.subtasks)
-        subtask_status = subtask_dict['status']
-        if current_task_id not in subtask_status:
+        subtask_status_info = subtask_dict['status']
+        if current_task_id not in subtask_status_info:
             # unexpected error -- raise an exception
             format_str = "Unexpected task_id '{}': unable to update status for email subtask of instructor task '{}'"
             msg = format_str.format(current_task_id, entry_id)
@@ -173,14 +173,12 @@ def update_subtask_status(entry_id, current_task_id, subtask_status):
         # will be updating before the original call, and we don't want their
         # ultimate status to be clobbered by the "earlier" updates.  This
         # should not be a problem in normal (non-eager) processing.
-        old_status = subtask_status[current_task_id]
+        current_subtask_status = subtask_status_info[current_task_id]
+        current_state = current_subtask_status['state']
         # TODO: check this logic...
-        state = subtask_status['state']
-#        if state != RETRY or old_status['status'] == QUEUING:
-        # instead replace the status only if it's 'newer'
-        # i.e. has fewer pending
-        if subtask_status['pending'] <= old_status['pending']:
-            subtask_status[current_task_id] = subtask_status
+        new_state = new_subtask_status['state']
+        if new_state != RETRY or current_state == QUEUING or current_state in READY_STATES:
+            subtask_status_info[current_task_id] = new_subtask_status
 
         # Update the parent task progress
         task_progress = json.loads(entry.task_output)
@@ -189,16 +187,16 @@ def update_subtask_status(entry_id, current_task_id, subtask_status):
         # change  behavior so we don't update on progress now:
         # TODO: figure out if we can make this more responsive later,
         # by figuring out how to handle retries better.
-        if subtask_status is not None and state in READY_STATES:
+        if new_subtask_status is not None and new_state in READY_STATES:
             for statname in ['attempted', 'succeeded', 'failed', 'skipped']:
-                task_progress[statname] += subtask_status[statname]
+                task_progress[statname] += new_subtask_status[statname]
 
         # Figure out if we're actually done (i.e. this is the last task to complete).
         # This is easier if we just maintain a counter, rather than scanning the
-        # entire subtask_status dict.
-        if state == SUCCESS:
+        # entire new_subtask_status dict.
+        if new_state == SUCCESS:
             subtask_dict['succeeded'] += 1
-        elif state == RETRY:
+        elif new_state == RETRY:
             subtask_dict['retried'] += 1
         else:
             subtask_dict['failed'] += 1

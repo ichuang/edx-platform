@@ -13,7 +13,11 @@ from traceback import format_exc
 
 from dogapi import dog_stats_api
 from smtplib import SMTPServerDisconnected, SMTPDataError, SMTPConnectError
-from boto.ses.exceptions import SESDailyQuotaExceededError, SESMaxSendingRateExceededError
+from boto.ses.exceptions import (
+    SESDailyQuotaExceededError,
+    SESMaxSendingRateExceededError,
+    SESAddressBlacklistedError,
+)
 from boto.exception import AWSConnectionError
 
 from celery import task, current_task, group
@@ -295,6 +299,7 @@ def send_course_email(entry_id, email_id, to_list, global_email_context, subtask
         update_subtask_status(entry_id, current_task_id, new_subtask_status)
         raise send_exception
 
+    log.info("background task (%s) returning status %s", current_task_id, new_subtask_status)
     return new_subtask_status
 
 
@@ -429,6 +434,12 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
                     dog_stats_api.increment('course_email.error', tags=[_statsd_tag(course_title)])
                     num_error += 1
 
+            except SESAddressBlacklistedError as exc:
+                    # This will fall through and not retry the message, since it will be popped
+                    log.warning('Task %s: email with id %s not delivered to %s due to error %s', task_id, email_id, email, exc)
+                    dog_stats_api.increment('course_email.error', tags=[_statsd_tag(course_title)])
+                    num_error += 1
+
             # Pop the user that was emailed off the end of the list:
             to_list.pop()
 
@@ -520,26 +531,28 @@ def _submit_for_retry(entry_id, email_id, to_list, global_email_context, current
         Otherwise, it (ought to be) the current_exception passed in.
     """
     task_id = _get_current_task().request.id
-    retry_index = _get_current_task().request.retries
 
     log.info("Task %s: Successfully sent to %s users; failed to send to %s users (and skipped %s users)",
-             current_task.request.id, subtask_progress['succeeded'], subtask_progress['failed'], subtask_progress['skipped'])
+             task_id, subtask_progress['succeeded'], subtask_progress['failed'], subtask_progress['skipped'])
 
     # Calculate time until we retry this task (in seconds):
+    base_delay = 15
     if is_sending_rate_error:
+        retry_index = subtask_progress['retriedA']
         exp = min(retry_index, 5)
-        countdown = ((2 ** exp) * 15) * random.uniform(.5, 1.25)
+        countdown = ((2 ** exp) * base_delay) * random.uniform(.5, 1.25)
         exception_type = 'sending-rate'
     else:
-        countdown = ((2 ** retry_index) * 15) * random.uniform(.75, 1.5)
+        retry_index = subtask_progress['retriedB']
+        countdown = ((2 ** retry_index) * base_delay) * random.uniform(.75, 1.5)
         exception_type = 'transient'
 
     # max_retries is increased by the number of times an "infinite-retry" exception
-    # has been retried.  We want the regular retries to trigger a retry, but not these
+    # has been retried.  We want the regular retries to trigger max-retry checking, but not these
     # special retries.  So we count them separately.
     max_retries = _get_current_task().max_retries + subtask_progress['retriedA']
-    log.warning('Task %s: email with id %d not delivered due to %s error %s, retrying send to %d recipients (with max_retry=%s)',
-                task_id, email_id, exception_type, current_exception, len(to_list), max_retries)
+    log.warning('Task %s: email with id %d not delivered due to %s error %s, retrying send to %d recipients in %s seconds (with max_retry=%s)',
+                task_id, email_id, exception_type, current_exception, len(to_list), countdown, max_retries)
 
     try:
         send_course_email.retry(
