@@ -259,8 +259,8 @@ def _signup(request, eamap):
                          honor_code = u'true',
                          terms_of_service = u'true',
                          )
-        log.info('doing immediate signup for %s, ret=%s' % (username, ret))
-        ret = student.views.create_account(request, post_vars)
+        log.info('doing immediate signup for %s, params=%s' % (username, post_vars))
+        student.views.create_account(request, post_vars)
         return redirect('/')
 
     # default conjoin name, no spaces, flattened to ascii b/c django can't handle unicode usernames, sadly
