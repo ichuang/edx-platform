@@ -530,6 +530,10 @@ def _adjust_start_date_for_beta_testers(user, descriptor):
         # bail early if no beta testing is set up
         return descriptor.start
 
+    if user is None or (not user.is_authenticated()):
+        # bail if no user to evaluate
+        return descriptor.start
+
     user_groups = [g.name for g in user.groups.all()]
 
     beta_group = course_beta_test_group_name(descriptor.location)
