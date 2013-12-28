@@ -1,0 +1,3 @@
+#!/bin/bash
+
+SERVICE_VARIANT=lms python manage.py lms --settings=aws $*
