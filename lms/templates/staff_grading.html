@@ -114,7 +114,7 @@ student to upload a new file.</p><p>All actions are logged.</p></div>
           <h3><div id="student_name"></div></h3>
           <form enctype="multipart/form-data" id="${modid}_grade_form" action="" method="post">
   	    Grade: <input type="text" name="grade"> <div id="grade_msg"></div>
-  	    Comment: <textarea name="comment" rows="4"></textarea>
+  	    Comment (max 1023 characters): <textarea name="comment" rows="4"></textarea>
 	    Annotated file (optional): <input type="file" name="file" id="sga_file2upload" />
   	    <input type="hidden" name="username">
   	    <input type="submit" value="Submit Grade" />

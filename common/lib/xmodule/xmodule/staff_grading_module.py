@@ -353,7 +353,7 @@ class StaffGradingModule(StaffGradingFields, XModule):
                 except Exception as err:
                     log.exception("oops failed to convert score=%s" % score)
                     return False, 'Bad grade value, must be numeric'
-                item['staff_comments'] = comments
+                item['staff_comments'] = comments[:1023]
                 item['graded_by'] = self.module.user
                 item['graded_dt'] = datetime.datetime.now()
             item.save()
