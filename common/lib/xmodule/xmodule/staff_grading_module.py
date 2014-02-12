@@ -311,7 +311,8 @@ class StaffGradingModule(StaffGradingFields, XModule):
             for k, v in status.items():
                 item[k] = v
             item.save()
-            self.log_action("Saved SDB item %s" % item)
+            module.log_action("Saved SDB item %s" % item)
+            return True, "Saved"
 
         def update_annotated(self, s3_filename, staff_filename, uname):
             '''
@@ -335,7 +336,7 @@ class StaffGradingModule(StaffGradingFields, XModule):
                 return False, 'No record found'
             item = rset[0]
             if score is None:
-                self.log_action('Removing grade, previously %s' % item)
+                self.module.log_action('Removing grade, previously %s' % item)
                 item['score'] = None
                 if 'staff_comments' in item:
                     item.pop('staff_comments')
