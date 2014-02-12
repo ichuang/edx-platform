@@ -327,7 +327,7 @@ class StaffGradingModule(StaffGradingFields, XModule):
             item.save()
             return True, 'Saved annotated file %s for %s' % (staff_filename, uname)
 
-        def update_status(self, score, comments, extra_match=None):
+        def update_status(self, score, comments, extra_match=None, remove_annotated=False):
             '''
             Update grade and comments.
             '''
@@ -344,6 +344,8 @@ class StaffGradingModule(StaffGradingFields, XModule):
                     item.pop('graded_dt')
                 item['staff_comments'] = None
                 item['graded_dt'] = None
+                if remove_annotated:
+                    item['annotated_staff_filename'] = None
             else:
                 try:
                     item['score'] = float(score)
@@ -404,7 +406,7 @@ class StaffGradingModule(StaffGradingFields, XModule):
         extra_match = []
         if 'uname' in data and self.system.user_is_staff:
             extra_match.append("username = '%s'" % data['uname'])
-        (ok, msg) = self.fstat.update_status(None, None, extra_match=extra_match)
+        (ok, msg) = self.fstat.update_status(None, None, extra_match=extra_match, remove_annotated=True)
         return json.dumps({'ok':ok, 'msg': msg})
 
     def do_download(self, data, is_annotated=False):
